@@ -39,6 +39,7 @@ class Segmentation{
 public:
 	Segmentation(){
 		pub = nh.advertise<sensor_msgs::PointCloud2> ("output", 1);
+		temp_pub = nh.advertise<sensor_msgs::PointCloud2> ("temp_output", 1);
 		marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 10);
 		//sub = nh.subscribe ("input", 1, cloud_cb);	//error: invalid use of non-static member function (why?)
 		sub = nh.subscribe ("input", 1, &Segmentation::cloud_cb, this);		//success (c.f. the upper error)
@@ -47,18 +48,25 @@ public:
 	}
 	void bbox_cb(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg);     //bounding box callback
 	void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input);
-	void visualize(int center_x, int center_y, int center_z);
+	void visualize(float center_x, float center_y, float center_z);
 	float vector_dot(vector<float> vec_a, vector<float> vec_b);
 	float vector_length(vector<float> vec_a);
+	void RGBtoHSV(float& fR, float& fG, float& fB, float& fH, float& fS, float& fV);
 
 private:
 	float x_max = 638.0;
 	float x_min = 0.0;
 	float y_max = 478.0;
 	float y_min = 0.0;
+	float fR = 0, fG = 0, fB = 0, fH = 0, fS = 0, fV = 0;
+
+	enum Color{RED, GREEN, BLUE};
+	int selected_color = 0;		//default: red cube
+	int count = 0;
 	
 	ros::NodeHandle nh;
 	ros::Publisher pub;
+	ros::Publisher temp_pub;
 	ros::Publisher marker_pub;
 	ros::Subscriber sub;
 	ros::Subscriber bbox_sub;

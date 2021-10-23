@@ -4,54 +4,21 @@
 void Segmentation::bbox_cb (const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 {
     for(int i=0 ; i < msg->bounding_boxes.size(); i++){     //problem: how to get msg (array) length, avoiding i out of range 
-        switch(selected_color){
-            case RED:
-                if(msg->bounding_boxes[i].Class == "red_cube" && msg->bounding_boxes[i].probability > 0.5){
-                    cout << "get red" << endl;
-                    cout << "prob: " << msg->bounding_boxes[i].probability << endl;
-                    x_max = msg->bounding_boxes[i].xmax>=640 ? 639 : msg->bounding_boxes[i].xmax;   //avoiding cloud.at std::out_of_range
-                    x_min = msg->bounding_boxes[i].xmin<=  0 ?   0 : msg->bounding_boxes[i].xmin;
-                    y_max = msg->bounding_boxes[i].ymax>=480 ? 479 : msg->bounding_boxes[i].ymax;   //y_max=480 does cause an error before 
-                    y_min = msg->bounding_boxes[i].ymin<=  0 ?   0 : msg->bounding_boxes[i].ymin;
-                    cout << "x_max: " << x_max << endl;
-                    cout << "x_min: " << x_min << endl;
-                    cout << "y_max: " << y_max << endl;
-                    cout << "y_min: " << y_min << endl;
-                    count ++;   
-                }
-                break;
-
-            case GREEN:
-                if(msg->bounding_boxes[i].Class == "green_cube" && msg->bounding_boxes[i].probability > 0.5){
-                    cout << "get green" << endl;
-                    cout << "prob: " << msg->bounding_boxes[i].probability << endl;
-                    x_max = msg->bounding_boxes[i].xmax>=640 ? 639 : msg->bounding_boxes[i].xmax;   //avoiding cloud.at std::out_of_range
-                    x_min = msg->bounding_boxes[i].xmin<=  0 ?   0 : msg->bounding_boxes[i].xmin;
-                    y_max = msg->bounding_boxes[i].ymax>=480 ? 479 : msg->bounding_boxes[i].ymax;   //y_max=480 does cause an error before 
-                    y_min = msg->bounding_boxes[i].ymin<=  0 ?   0 : msg->bounding_boxes[i].ymin;
-                    count ++;
-                }
-                break;
-
-            case BLUE:
-                if(msg->bounding_boxes[i].Class == "blue_cube" && msg->bounding_boxes[i].probability > 0.5){
-                    cout << "get blue" << endl;
-                    cout << "prob: " << msg->bounding_boxes[i].probability << endl;
-                    x_max = msg->bounding_boxes[i].xmax>=640 ? 639 : msg->bounding_boxes[i].xmax;   //avoiding cloud.at std::out_of_range
-                    x_min = msg->bounding_boxes[i].xmin<=  0 ?   0 : msg->bounding_boxes[i].xmin;
-                    y_max = msg->bounding_boxes[i].ymax>=480 ? 479 : msg->bounding_boxes[i].ymax;   //y_max=480 does cause an error before 
-                    y_min = msg->bounding_boxes[i].ymin<=  0 ?   0 : msg->bounding_boxes[i].ymin;
-                    count ++;
-                }
-                break;
-
-            default:
-                cout << "color selection error at bbox" << endl;
-                break;     
-        }
-        if(count >= 1){
-            count = 0;
+        if(msg->bounding_boxes[i].Class == "blue_cube" && msg->bounding_boxes[i].probability > 0.5){
+            cout << "get blue" << endl;
+            cout << "prob: " << msg->bounding_boxes[i].probability << endl;
+            x_max = msg->bounding_boxes[i].xmax>=640 ? 639 : msg->bounding_boxes[i].xmax;   //avoiding cloud.at std::out_of_range
+            x_min = msg->bounding_boxes[i].xmin<=  0 ?   0 : msg->bounding_boxes[i].xmin;
+            y_max = msg->bounding_boxes[i].ymax>=480 ? 479 : msg->bounding_boxes[i].ymax;   //y_max=480 does cause an error before 
+            y_min = msg->bounding_boxes[i].ymin<=  0 ?   0 : msg->bounding_boxes[i].ymin;
+            cout << "x_max: " << x_max << endl;
+            cout << "x_min: " << x_min << endl;
+            cout << "y_max: " << y_max << endl;
+            cout << "y_min: " << y_min << endl;
             break;
+        }
+        else{
+            cout << "Not that color cube" << endl;       
         }
     }
     cout << "end of bbox_cb" << endl;
@@ -135,7 +102,7 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
 //-------------------- select the top plane of the cube ---------------------
     //pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_top(new pcl::PointCloud<pcl::PointXYZ>);   
     while(1){
-//-------------------- second segmentation to seg top plane ---------------------
+//-------------------- second (original) segmentation ---------------------
         //pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
         //pcl::PointIndices inliers;
         //pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
@@ -150,7 +117,7 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
         vector<float> vec2 { coefficients->values[0], coefficients->values[1], coefficients->values[2] };
 
 
-//-------------------- second extraction to extract the top plane ---------------------
+//-------------------- extract the final plane ---------------------
         pcl::ExtractIndices<pcl::PointXYZRGB> extract;
         //pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_remain(new pcl::PointCloud<pcl::PointXYZ>);
         extract.setInputCloud(pass2_cloud);
@@ -174,7 +141,6 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
         double vec_theta = acos((double) vec_dot/(vec1_len*vec2_len));  //radian
         cout << "vec_theta: " << vec_theta*180/3.14159 << endl;         //degree
 
-        //comparing the plane's normal vector with ground's
         if(vec_theta < 5 *3.14159/180){         // 5 is degree
             cout << "It's right plane !"<< endl;
             break;
@@ -196,28 +162,9 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
         fB = cloud_top->points[i].b;
         RGBtoHSV(fR, fG, fB, fH, fS, fV);
         cout << fH << " ";
-        switch(selected_color){
-            case RED:
-                if(fH < 20 || fH > 350){    //red
-                    cloud_output->push_back(cloud_top->points[i]);
-                    //cout << "output red plane";
-                }
-                break;
-            case GREEN:    
-                if(fH > 140 && fH < 175){       //green
-                    cloud_output->push_back(cloud_top->points[i]);
-                    //cout << "output green plane";
-                }
-                break;
-            case BLUE:
-                if(fH > 200 && fH < 220){       //biue
-                    cloud_output->push_back(cloud_top->points[i]);
-                    //cout << "output blue plane";
-                }
-                break;
-            default:
-                cout << "color selection error at top plane";
-                break;
+        if(fH > 200 && fH < 220){       //biue
+            cloud_output->push_back(cloud_top->points[i]);
+            cout << "output blue";
         }
     }
     cout << endl;
@@ -285,7 +232,7 @@ void Segmentation::visualize(float center_x, float center_y, float center_z)
 {
     //visualize centroid in rviz
     visualization_msgs::Marker points;
-    points.header.frame_id = "camera_color_optical_frame";
+    points.header.frame_id = "camera_depth_optical_frame";
     points.header.stamp = ros::Time::now();
     points.ns = "segmentation";
     points.action = visualization_msgs::Marker::ADD;
