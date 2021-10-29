@@ -28,6 +28,12 @@
 
 #include <pcl/sample_consensus/sac_model_normal_plane.h>
 
+#include <tf/transform_broadcaster.h>
+#include <sensor_msgs/Imu.h>
+
+#include <geometry_msgs/PointStamped.h>
+#include <tf/transform_listener.h>
+
 #include <math.h>
 #include <vector>
 
@@ -44,7 +50,9 @@ public:
 		//sub = nh.subscribe ("input", 1, cloud_cb);	//error: invalid use of non-static member function (why?)
 		sub = nh.subscribe ("input", 1, &Segmentation::cloud_cb, this);		//success (c.f. the upper error)
 		//bbox_sub = nh.subscribe ("darknet_ros/bounding_boxes", 100, bbox_cb);
-		bbox_sub = nh.subscribe ("darknet_ros/bounding_boxes", 100, &Segmentation::bbox_cb, this);			
+		bbox_sub = nh.subscribe ("darknet_ros/bounding_boxes", 100, &Segmentation::bbox_cb, this);
+		accel_sub = nh.subscribe("camera/accel/sample", 10, &Segmentation::accel_cb, this);
+		point_pub = nh.advertise<geometry_msgs::PointStamped> ("point_output", 1);
 	}
 	void bbox_cb(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg);     //bounding box callback
 	void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input);
@@ -52,6 +60,7 @@ public:
 	float vector_dot(vector<float> vec_a, vector<float> vec_b);
 	float vector_length(vector<float> vec_a);
 	void RGBtoHSV(float& fR, float& fG, float& fB, float& fH, float& fS, float& fV);
+	void accel_cb(const sensor_msgs::Imu& msg);
 
 private:
 	float x_max = 638.0;
@@ -70,6 +79,18 @@ private:
 	ros::Publisher marker_pub;
 	ros::Subscriber sub;
 	ros::Subscriber bbox_sub;
+	ros::Subscriber accel_sub;
+	ros::Publisher point_pub;
+
+	//static tf::TransformBroadcaster br;	//will cause cmake error (why?)
+	tf::TransformBroadcaster br;
+    tf::Transform transform;
+	tf::Quaternion q;
+    double roll = 0, pitch = 0;		//each roll, pitch. Below, calculated from the value of each topic
+
+	tf::TransformListener listener;
+	geometry_msgs::PointStamped camera_point;
+	geometry_msgs::PointStamped base_point;
 
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_input{new pcl::PointCloud<pcl::PointXYZRGB>};	//why use {}, tried () and = but both fail 
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_voxel{new pcl::PointCloud<pcl::PointXYZRGB>};
