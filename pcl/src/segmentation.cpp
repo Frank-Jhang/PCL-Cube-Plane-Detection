@@ -1,59 +1,73 @@
 #include "pcl/segmentation.h"
 
+void Segmentation::accel_cb(const sensor_msgs::Imu& msg)
+{
+    roll = atan(msg.linear_acceleration.y / msg.linear_acceleration.z);
+    pitch = atan(-msg.linear_acceleration.x / (sqrt(pow(msg.linear_acceleration.y,2)+pow(msg.linear_acceleration.z,2))));
+
+    q.setRPY(roll, pitch, 0);
+
+    transform.setOrigin( tf::Vector3(0.0, 0.0, 0.0) );  //set translation ?
+    transform.setRotation(q);   //set rotation
+
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "base_link", "camera_link"));    //deliver the TF the parent frames world, a child frame as Camera_link 
+}
 
 void Segmentation::bbox_cb (const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 {
     for(int i=0 ; i < msg->bounding_boxes.size(); i++){     //problem: how to get msg (array) length, avoiding i out of range 
         switch(selected_color){
-            case RED:
-                if(msg->bounding_boxes[i].Class == "red_cube" && msg->bounding_boxes[i].probability > 0.5){
-                    cout << "get red" << endl;
-                    cout << "prob: " << msg->bounding_boxes[i].probability << endl;
-                    x_max = msg->bounding_boxes[i].xmax>=640 ? 639 : msg->bounding_boxes[i].xmax;   //avoiding cloud.at std::out_of_range
-                    x_min = msg->bounding_boxes[i].xmin<=  0 ?   0 : msg->bounding_boxes[i].xmin;
-                    y_max = msg->bounding_boxes[i].ymax>=480 ? 479 : msg->bounding_boxes[i].ymax;   //y_max=480 does cause an error before 
-                    y_min = msg->bounding_boxes[i].ymin<=  0 ?   0 : msg->bounding_boxes[i].ymin;
-                    cout << "x_max: " << x_max << endl;
-                    cout << "x_min: " << x_min << endl;
-                    cout << "y_max: " << y_max << endl;
-                    cout << "y_min: " << y_min << endl;
-                    count ++;   
-                }
-                break;
+        case RED:
+            if(msg->bounding_boxes[i].Class == "red_cube" && msg->bounding_boxes[i].probability > 0.5){
+                cout << "get red" << endl;
+                cout << "prob: " << msg->bounding_boxes[i].probability << endl;
+                x_max = msg->bounding_boxes[i].xmax>=640 ? 639 : msg->bounding_boxes[i].xmax;   //avoiding cloud.at std::out_of_range
+                x_min = msg->bounding_boxes[i].xmin<=  0 ?   0 : msg->bounding_boxes[i].xmin;
+                y_max = msg->bounding_boxes[i].ymax>=480 ? 479 : msg->bounding_boxes[i].ymax;   //y_max=480 does cause an error before 
+                y_min = msg->bounding_boxes[i].ymin<=  0 ?   0 : msg->bounding_boxes[i].ymin;
+                cout << "x_max: " << x_max << endl;
+                cout << "x_min: " << x_min << endl;
+                cout << "y_max: " << y_max << endl;
+                cout << "y_min: " << y_min << endl;
+                count ++;   
+            }
+            break;
 
-            case GREEN:
-                if(msg->bounding_boxes[i].Class == "green_cube" && msg->bounding_boxes[i].probability > 0.5){
-                    cout << "get green" << endl;
-                    cout << "prob: " << msg->bounding_boxes[i].probability << endl;
-                    x_max = msg->bounding_boxes[i].xmax>=640 ? 639 : msg->bounding_boxes[i].xmax;   //avoiding cloud.at std::out_of_range
-                    x_min = msg->bounding_boxes[i].xmin<=  0 ?   0 : msg->bounding_boxes[i].xmin;
-                    y_max = msg->bounding_boxes[i].ymax>=480 ? 479 : msg->bounding_boxes[i].ymax;   //y_max=480 does cause an error before 
-                    y_min = msg->bounding_boxes[i].ymin<=  0 ?   0 : msg->bounding_boxes[i].ymin;
-                    count ++;
-                }
-                break;
+        case GREEN:
+            if(msg->bounding_boxes[i].Class == "green_cube" && msg->bounding_boxes[i].probability > 0.5){
+                cout << "get green" << endl;
+                cout << "prob: " << msg->bounding_boxes[i].probability << endl;
+                x_max = msg->bounding_boxes[i].xmax>=640 ? 639 : msg->bounding_boxes[i].xmax;   //avoiding cloud.at std::out_of_range
+                x_min = msg->bounding_boxes[i].xmin<=  0 ?   0 : msg->bounding_boxes[i].xmin;
+                y_max = msg->bounding_boxes[i].ymax>=480 ? 479 : msg->bounding_boxes[i].ymax;   //y_max=480 does cause an error before 
+                y_min = msg->bounding_boxes[i].ymin<=  0 ?   0 : msg->bounding_boxes[i].ymin;
+                count ++;
+            }
+            break;
 
-            case BLUE:
-                if(msg->bounding_boxes[i].Class == "blue_cube" && msg->bounding_boxes[i].probability > 0.5){
-                    cout << "get blue" << endl;
-                    cout << "prob: " << msg->bounding_boxes[i].probability << endl;
-                    x_max = msg->bounding_boxes[i].xmax>=640 ? 639 : msg->bounding_boxes[i].xmax;   //avoiding cloud.at std::out_of_range
-                    x_min = msg->bounding_boxes[i].xmin<=  0 ?   0 : msg->bounding_boxes[i].xmin;
-                    y_max = msg->bounding_boxes[i].ymax>=480 ? 479 : msg->bounding_boxes[i].ymax;   //y_max=480 does cause an error before 
-                    y_min = msg->bounding_boxes[i].ymin<=  0 ?   0 : msg->bounding_boxes[i].ymin;
-                    count ++;
-                }
-                break;
+        case BLUE:
+            if(msg->bounding_boxes[i].Class == "blue_cube" && msg->bounding_boxes[i].probability > 0.5){
+                cout << "get blue" << endl;
+                cout << "prob: " << msg->bounding_boxes[i].probability << endl;
+                x_max = msg->bounding_boxes[i].xmax>=640 ? 639 : msg->bounding_boxes[i].xmax;   //avoiding cloud.at std::out_of_range
+                x_min = msg->bounding_boxes[i].xmin<=  0 ?   0 : msg->bounding_boxes[i].xmin;
+                y_max = msg->bounding_boxes[i].ymax>=480 ? 479 : msg->bounding_boxes[i].ymax;   //y_max=480 does cause an error before 
+                y_min = msg->bounding_boxes[i].ymin<=  0 ?   0 : msg->bounding_boxes[i].ymin;
+                count ++;
+            }
+            break;
 
-            default:
-                cout << "color selection error at bbox" << endl;
-                break;     
-        }
+        default:
+            cout << "color selection error at bbox" << endl;
+            break;     
+
+        }   //end of switch
+
         if(count >= 1){
             count = 0;
             break;
         }
-    }
+    }       //end of for
     cout << "end of bbox_cb" << endl;
 }
 
@@ -244,7 +258,7 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     // temp_pub.publish(temp_output);
 
 
-//-------------------- output ---------------------
+//-------------------- point cloud output ---------------------
     sensor_msgs::PointCloud2 output;
     // pcl_conversions::fromPCL(*inliers, output);
     pcl::toROSMsg(*cloud_output, output);
@@ -253,6 +267,23 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     pub.publish(output);
     cout << "output.width: " << output.width << endl;
     cout << "output.height: " << output.height << endl;
+
+
+//-------------------- transformed point output ---------------------
+    camera_point.header.frame_id = "camera_color_optical_frame";
+    camera_point.header.stamp = ros::Time();
+    camera_point.point.x = centroid(0);
+    camera_point.point.y = centroid(1);
+    camera_point.point.z = centroid(2);
+
+    try{
+        listener.waitForTransform("base_link", "camera_color_optical_frame", ros::Time(0), ros::Duration(10.0) );
+        listener.transformPoint("base_link", camera_point, base_point);     //transform the final point from camera to base
+        point_pub.publish(base_point);
+    }
+    catch(tf::TransformException& ex){
+        ROS_ERROR("Received an exception when doing point transformation: %s", ex.what());
+    }
 
 
 //-------------------- end ---------------------
