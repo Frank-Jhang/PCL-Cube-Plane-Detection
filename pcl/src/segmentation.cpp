@@ -1,16 +1,21 @@
 #include "pcl/segmentation.h"
 
+
 void Segmentation::accel_cb(const sensor_msgs::Imu& msg)
 {
-    roll = atan(msg.linear_acceleration.y / msg.linear_acceleration.z);
-    pitch = atan(-msg.linear_acceleration.x / (sqrt(pow(msg.linear_acceleration.y,2)+pow(msg.linear_acceleration.z,2))));
+    // roll = atan(msg.linear_acceleration.y / msg.linear_acceleration.z);
+    // pitch = atan(-msg.linear_acceleration.x / (sqrt(pow(msg.linear_acceleration.y,2)+pow(msg.linear_acceleration.z,2))));
 
-    q.setRPY(roll, pitch, 0);
+    // cout << "roll: " << roll << endl;
+    // cout << "pitch: " << pitch << endl;
 
-    transform.setOrigin( tf::Vector3(0.0, 0.0, 0.0) );  //set translation ?
-    transform.setRotation(q);   //set rotation
+    // q.setRPY(roll, pitch, 0);
 
-    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "base_link", "camera_link"));    //deliver the TF the parent frames world, a child frame as Camera_link 
+    // transform.setOrigin( tf::Vector3(0.0, 0.0, 0.0) );  //set translation ?
+    // transform.setRotation(q);   //set rotation
+
+    // br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "base_footprint", "camera_link"));    //deliver the TF the parent frames world, a child frame as Camera_link 
+    // cout << "end of accel_cb" << endl;
 }
 
 void Segmentation::bbox_cb (const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
@@ -197,7 +202,7 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
             pass2_cloud.swap(cloud_remain);     //why not pass2_cloud->swap()
             cout << "Not that plane AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA."<< endl;
         }
-    }
+    }   //end of while
 
 
 //-------------------- choose the right color point cloud ---------------------
@@ -235,6 +240,7 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
         }
     }
     cout << endl;
+    cout << "selected color: " << selected_color << endl;
 
 
 //-------------------- calculate centroid ---------------------
@@ -277,8 +283,8 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     camera_point.point.z = centroid(2);
 
     try{
-        listener.waitForTransform("base_link", "camera_color_optical_frame", ros::Time(0), ros::Duration(10.0) );
-        listener.transformPoint("base_link", camera_point, base_point);     //transform the final point from camera to base
+        listener.waitForTransform("base_footprint", "camera_color_optical_frame", ros::Time(0), ros::Duration(10.0) );
+        listener.transformPoint("base_footprint", camera_point, base_point);     //transform the final point from camera to base
         point_pub.publish(base_point);
     }
     catch(tf::TransformException& ex){
@@ -383,6 +389,7 @@ void Segmentation::RGBtoHSV(float& fR, float& fG, float& fB, float& fH, float& f
 int main (int argc, char** argv)
 {
     ros::init (argc, argv, "segmentation");
+    cout << "pcl node is starting!" << endl;
     Segmentation seg_obj;
     ros::spin ();
 }
