@@ -1,0 +1,7 @@
+<launch>
+    <node pkg="pcl" type="segmentation" name="segmentation" output="screen">
+        <!-- <remap from="input" to="/camera/depth/color/points"/> -->
+        <remap from="input" to="/camera/depth_registered/points"/>
+    </node>
+    <node pkg="tf" type="static_transform_publisher" name="camera_base_tf" args="0.11387 0 0.17 0 0.785 0 base_footprint camera_link 100" />
+</launch>
