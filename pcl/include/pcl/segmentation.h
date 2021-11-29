@@ -34,6 +34,8 @@
 #include <geometry_msgs/PointStamped.h>
 #include <tf/transform_listener.h>
 
+#include "robot_arm/armCommand.h"
+
 #include <math.h>
 #include <vector>
 
@@ -45,6 +47,7 @@ class Segmentation{
 public:
 	Segmentation(){
 		pub = nh.advertise<sensor_msgs::PointCloud2> ("output", 1);
+		voxel_pub = nh.advertise<sensor_msgs::PointCloud2> ("voxel", 1);
 		temp_pub = nh.advertise<sensor_msgs::PointCloud2> ("temp_output", 1);
 		marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 10);
 		//sub = nh.subscribe ("input", 1, cloud_cb);	//error: invalid use of non-static member function (why?)
@@ -53,6 +56,7 @@ public:
 		bbox_sub = nh.subscribe ("darknet_ros/bounding_boxes", 100, &Segmentation::bbox_cb, this);
 		accel_sub = nh.subscribe("camera/accel/sample", 10, &Segmentation::accel_cb, this);
 		point_pub = nh.advertise<geometry_msgs::PointStamped> ("point_output", 1);
+		color_sub = nh.subscribe("arm_mission", 10, &Segmentation::color_cb, this);
 	}
 	void bbox_cb(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg);     //bounding box callback
 	void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input);
@@ -61,6 +65,7 @@ public:
 	float vector_length(vector<float> vec_a);
 	void RGBtoHSV(float& fR, float& fG, float& fB, float& fH, float& fS, float& fV);
 	void accel_cb(const sensor_msgs::Imu& msg);
+	void color_cb(const robot_arm::armCommand& msg);
 
 private:
 	float x_max = 638.0;
@@ -70,17 +75,20 @@ private:
 	float fR = 0, fG = 0, fB = 0, fH = 0, fS = 0, fV = 0;
 
 	enum Color{RED, GREEN, BLUE};
-	int selected_color = 0;		//default: red cube
+	int selected_color = 1;		//can be selected by people, default: red cube
 	int count = 0;
+	bool get_color = false;
 	
 	ros::NodeHandle nh;
 	ros::Publisher pub;
+	ros::Publisher voxel_pub;
 	ros::Publisher temp_pub;
 	ros::Publisher marker_pub;
 	ros::Subscriber sub;
 	ros::Subscriber bbox_sub;
 	ros::Subscriber accel_sub;
 	ros::Publisher point_pub;
+	ros::Subscriber color_sub;
 
 	//static tf::TransformBroadcaster br;	//will cause cmake error (why?)
 	tf::TransformBroadcaster br;
