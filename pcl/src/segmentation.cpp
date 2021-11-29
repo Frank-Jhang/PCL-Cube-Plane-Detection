@@ -1,5 +1,17 @@
 #include "pcl/segmentation.h"
 
+void Segmentation::color_cb(const robot_arm::armCommand& msg){
+    if(msg.color == "Red")
+        selected_color = 0;
+    if(msg.color == "Green")
+        selected_color = 1;
+    if(msg.color == "Blue")
+        selected_color = 2;
+    if(msg.color == "No")
+        cout << "color command error" << endl;
+    get_color = true;
+    cout << "color command: " << selected_color << endl;
+}
 
 void Segmentation::accel_cb(const sensor_msgs::Imu& msg)
 {
@@ -79,8 +91,8 @@ void Segmentation::bbox_cb (const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg
 
 void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
 {
-    cout << "original width: " << input->width << endl;
-    cout << "original height: " << input->height << endl;
+    // cout << "original width: " << input->width << endl;
+    // cout << "original height: " << input->height << endl;
 
 //-------------------- convert the sensor_msgs/PointCloud2 data to pcl/PointCloud ---------------------
     //pcl::PointCloud<pcl::PointXYZ> cloud;
@@ -90,10 +102,10 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
 //-------------------- get bbox Euclidean coordinates ---------------------
     // pt1: left top
     pcl::PointXYZRGB pt1 = cloud_input->at(x_min, y_min);     //unit: pixel (column, row)   //must be organized point cloud !!!
-    cout << "pt1: " << pt1 << endl;                 //unit: m (p1.x, p1.y, p1.z)  
+    // cout << "pt1: " << pt1 << endl;                 //unit: m (p1.x, p1.y, p1.z)  
     // pt2: right bottom
     pcl::PointXYZRGB pt2 = cloud_input->at(x_max, y_max);     //unit: pixel (column, row)
-    cout << "pt2: " << pt2 << endl;                 //unit: m (p1.x, p1.y, p1.z)
+    // cout << "pt2: " << pt2 << endl;                 //unit: m (p1.x, p1.y, p1.z)
 
 
 //-------------------- voxel grid (downsample) ---------------------
@@ -102,8 +114,15 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     voxel.setInputCloud(cloud_input);
     voxel.setLeafSize(0.005f, 0.005f, 0.005f);
     voxel.filter(*cloud_voxel);
-    cout << "cloud_voxel width: " << cloud_voxel->width << endl;
-    cout << "cloud_voxel height: " << cloud_voxel->height << endl;
+    // cout << "cloud_voxel width: " << cloud_voxel->width << endl;
+    // cout << "cloud_voxel height: " << cloud_voxel->height << endl;
+
+    sensor_msgs::PointCloud2 voxel_output;
+    // pcl_conversions::fromPCL(*inliers, output);
+    pcl::toROSMsg(*cloud_voxel, voxel_output);
+    voxel_output.header.frame_id = "camera_color_optical_frame";
+    voxel_output.header.stamp = ros::Time::now();
+    voxel_pub.publish(voxel_output);
 
 
 //-------------------- first segmentation to seg ground and get ground coeff. ---------------------
@@ -128,27 +147,35 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     extract1.setNegative(true);     // true: outlier   //false: inlier
     extract1.filter(*cloud_without_ground);
 
+    cout << "cloud_without_ground width: " << cloud_without_ground->width << endl;
+    cout << "cloud_without_ground height: " << cloud_without_ground->height << endl;
 
 //-------------------- pass through filter ---------------------
     //pcl::PointCloud<pcl::PointXYZ>::Ptr pass_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     //pcl::PointCloud<pcl::PointXYZ>::Ptr pass2_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+
+    // pass2_cloud = cloud_without_ground;
+
     pcl::PassThrough<pcl::PointXYZRGB> pass;
     pass.setInputCloud(cloud_without_ground);  
     pass.setFilterFieldName("x");
-    pass.setFilterLimits(pt1.x, pt2.x);     //unit: m?
-    // pass.setFilterLimits(-0.02, 0.057);
+    // pass.setFilterLimits(pt1.x, pt2.x);     //unit: m?
+    pass.setFilterLimits(-0.15, 0.15);
     pass.filter(*pass_cloud);
 
     pass.setInputCloud(pass_cloud);
     pass.setFilterFieldName("y");
-    pass.setFilterLimits(pt1.y, pt2.y);
-    // pass.setFilterLimits(-0.1, 0.042);
+    // pass.setFilterLimits(pt1.y, pt2.y);
+    pass.setFilterLimits(-0.15, 0.15);
     pass.filter(*pass2_cloud);
 
     cout << "pt1.x: " << pt1.x << endl;
     cout << "pt2.x: " << pt2.x << endl;
     cout << "pt1.y: " << pt1.y << endl;
     cout << "pt2.y: " << pt2.y << endl;
+
+    cout << "pass width: " << pass2_cloud->width << endl;
+    cout << "pass height: " << pass2_cloud->height << endl;
     
 
 //-------------------- select the top plane of the cube ---------------------
@@ -191,10 +218,10 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
         float vec2_len = vector_length(vec2);
         //cout << "vec2_len: " << vec2_len << endl;
         double vec_theta = acos((double) vec_dot/(vec1_len*vec2_len));  //radian
-        cout << "vec_theta: " << vec_theta*180/3.14159 << endl;         //degree
+        cout << "vec_theta: " << vec_theta * 180/3.14159 << endl;         //degree
 
         //comparing the plane's normal vector with ground's
-        if(vec_theta < 5 *3.14159/180){         // 5 is degree
+        if(vec_theta < 5 *3.14159/180 || vec_theta > 175 *3.14159/180){         // 5 is degree
             cout << "It's right plane !"<< endl;
             break;
         }
@@ -217,19 +244,19 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
         cout << fH << " ";
         switch(selected_color){
             case RED:
-                if(fH < 20 || fH > 350){    //red
+                if(fH < 20 || fH > 330){    //red
                     cloud_output->push_back(cloud_top->points[i]);
                     //cout << "output red plane";
                 }
                 break;
             case GREEN:    
-                if(fH > 140 && fH < 175){       //green
+                if(fH > 110 && fH < 175){       //green
                     cloud_output->push_back(cloud_top->points[i]);
                     //cout << "output green plane";
                 }
                 break;
             case BLUE:
-                if(fH > 200 && fH < 220){       //biue
+                if(fH > 180 && fH < 220){       //biue
                     cloud_output->push_back(cloud_top->points[i]);
                     //cout << "output blue plane";
                 }
@@ -285,7 +312,9 @@ void Segmentation::cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     try{
         listener.waitForTransform("base_footprint", "camera_color_optical_frame", ros::Time(0), ros::Duration(10.0) );
         listener.transformPoint("base_footprint", camera_point, base_point);     //transform the final point from camera to base
-        point_pub.publish(base_point);
+        base_point.point.y += 0.015;    // <xacro:property name="d435_cam_depth_to_color_offset" value="0.015"/>
+        if(get_color == true)
+            point_pub.publish(base_point);
     }
     catch(tf::TransformException& ex){
         ROS_ERROR("Received an exception when doing point transformation: %s", ex.what());
@@ -338,17 +367,25 @@ void Segmentation::visualize(float center_x, float center_y, float center_z)
     // points.scale.z = 0.02;
     points.scale.x = 0.008;     //shaft diameter
     points.scale.y = 0.013;     //head diameter
-    points.scale.z = 0.03;      //head length
-    points.color.r = 1.0f;      //color: red
+    points.scale.z = 0.025;      //head length
+    if(selected_color == RED){
+        points.color.r = 1.0;  points.color.g = 0.0;  points.color.b = 0.0;     //color: red
+    }
+    if(selected_color == GREEN){
+        points.color.r = 0.0;  points.color.g = 1.0;  points.color.b = 0.0;
+    }
+    if(selected_color == BLUE){
+        points.color.r = 0.0;  points.color.g = 0.0;  points.color.b = 1.0;
+    }
     points.color.a = 1.0;
     geometry_msgs::Point p;
     p.x = center_x;
     p.y = center_y;
     p.z = center_z;
     points.points.push_back(p);
-    p.x = center_x + coefficients_ground->values[0]/10;
-    p.y = center_y + coefficients_ground->values[1]/10;
-    p.z = center_z + coefficients_ground->values[2]/10;
+    p.x = center_x - abs(coefficients_ground->values[0]/15);
+    p.y = center_y - abs(coefficients_ground->values[1]/15);
+    p.z = center_z - abs(coefficients_ground->values[2]/15);
     points.points.push_back(p);
     marker_pub.publish(points);
 }
